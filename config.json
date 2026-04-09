@@ -1,0 +1,28 @@
+
+---
+
+### 2. `config.json`
+
+```json
+{
+  "wechat": {
+    "appId": "YOUR_APPID",
+    "appSecret": "YOUR_APPSECRET"
+  },
+  "schedule": {
+    "cron": "0 8 * * *",
+    "timezone": "Asia/Shanghai"
+  },
+  "templates": {
+    "footer": "\n\n---\n\n👇 扫码问一弭，获取定制化建议\n\n[二维码图片]",
+    "cta": {
+      "workplace": "扫码问一弭，制定你的职场策略",
+      "social": "扫码问一弭，获取人际交往技巧",
+      "love": "扫码问一弭，分析你的情感困惑",
+      "family": "扫码问一弭，化解家庭矛盾",
+      "life": "扫码问一弭，找到人生方向",
+      "mental": "扫码问一弭，调节心理状态",
+      "growth": "扫码问一弭，提升个人能力"
+    }
+  }
+}
