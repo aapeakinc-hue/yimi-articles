@@ -1,0 +1,35 @@
+name: 文章自动发布
+
+on:
+  schedule:
+    - cron: '0 0 * * *'
+  workflow_dispatch:
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v3
+
+      - name: 设置Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+
+      - name: 安装依赖
+        run: |
+          cd scripts
+          npm install axios
+
+      - name: 执行发布
+        env:
+          WECHAT_APPID: ${{ secrets.WECHAT_APPID }}
+          WECHAT_APPSECRET: ${{ secrets.WECHAT_APPSECRET }}
+        run: bash scripts/publish.sh
+
+      - name: 发送通知
+        if: success()
+        run: |
+          echo "✅ 文章发布成功"
