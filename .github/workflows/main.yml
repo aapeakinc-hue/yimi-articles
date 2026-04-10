@@ -1,4 +1,5 @@
-name: 文章自动发布
+name:
+ 文章自动发布
 
 on:
   schedule:
@@ -7,37 +8,50 @@ on:
 
 jobs:
   publish:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-
+latest
 
     steps:
-      - name: 检出代码
-        uses: actions/checkout@v3
+      - name:
+ 检出代码
+        uses:
+ actions/checkout@v4
 
-      - name: 设置Node.js
-        uses: actions/setup-node@v3
+      - name:
+ 设置Node.js
+        uses: actions/setup-
+node@v4
         with:
           node-version: '18'
 
-      - name: 安装依赖
+      - name:
+ 安装依赖
         run: |
           cd scripts
           npm install
 
-      - name: 执行发布
+      - name:
+ 执行发布
         env:
           TZ: 'Asia/Shanghai'
-        run: bash scripts/publish.sh
+        run:
+ bash scripts/publish.sh
 
-      - name: 上传文章文件
-        uses: actions/upload-artifact@v3
-        if: success()
+      - name:
+ 上传文章文件
+        uses: actions/upload-
+artifact@v4
+        if:
+ success()
         with:
           name: 今日文章-${{ github.run_number }}
           path: output/*.txt
           retention-days: 7
 
-      - name: 发送通知
-        if: success()
+      - name:
+ 发送通知
+        if:
+ success()
         run: |
           echo "✅ 文章发布成功"
           echo "📦 请在Artifacts中下载今日文章"
