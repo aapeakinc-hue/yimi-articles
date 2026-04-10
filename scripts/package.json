@@ -1,1 +1,12 @@
-
+{
+  "name": "yimi-publish",
+  "version": "1.0.0",
+  "description": "一弭文章自动发布系统",
+  "main": "publish.js",
+  "scripts": {
+    "start": "node publish.js"
+  },
+  "keywords": ["wechat", "publish"],
+  "author": "一弭",
+  "license": "MIT"
+}
