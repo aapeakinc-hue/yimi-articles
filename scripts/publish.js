@@ -1,12 +1,7 @@
 const fs = require('fs');
 const path = require('path');
-const https = require('https');
 
 const config = require('../config.json');
-
-// 从环境变量获取配置
-const appId = process.env.WECHAT_APPID || config.wechat.appId;
-const appSecret = process.env.WECHAT_APPSECRET || config.wechat.appSecret;
 
 function getTodayArticle() {
   const today = new Date();
@@ -73,185 +68,80 @@ function formatForWeChat(article) {
   return content + '\n\n' + cta + footer;
 }
 
-// 获取Access Token
-function getAccessToken() {
-  return new Promise((resolve, reject) => {
-    const url = `https://api.weixin.qq.com/cgi-bin/token?grant_type=client_credential&appid=${appId}&secret=${appSecret}`;
-    
-    https.get(url, (res) => {
-      let data = '';
-      res.on('data', (chunk) => {
-        data += chunk;
-      });
-      res.on('end', () => {
-        try {
-          const response = JSON.parse(data);
-          if (response.access_token) {
-            resolve(response.access_token);
-          } else {
-            reject(new Error(`获取Access Token失败: ${response.errmsg}`));
-          }
-        } catch (e) {
-          reject(new Error(`解析响应失败: ${e.message}`));
-        }
-      });
-    }).on('error', (e) => {
-      reject(new Error(`请求失败: ${e.message}`));
-    });
-  });
+// 生成今日文章文件
+function generateTodayFile(formattedArticle, metadata) {
+  const today = new Date();
+  const dateStr = today.toISOString().split('T')[0];
+  
+  // 确保输出目录存在
+  const outputDir = path.join(__dirname, '../output');
+  if (!fs.existsSync(outputDir)) {
+    fs.mkdirSync(outputDir, { recursive: true });
+  }
+  
+  // 生成文件名
+  const filename = `今日文章-${dateStr}.txt`;
+  const filepath = path.join(outputDir, filename);
+  
+  // 生成文件内容（包含元数据和正文）
+  const fileContent = `========================================
+一弭 · 今日文章
+========================================
+发布日期: ${today.toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' })}
+文章标题: ${metadata.title || '未命名'}
+文章分类: ${metadata.category || '通用'}
+文章标签: ${metadata.tags ? metadata.tags.join(', ') : '无'}
+========================================
+
+${formattedArticle}
+
+========================================
+发布说明：
+1. 复制以上内容到公众号后台
+2. 新建图文消息
+3. 粘贴内容并调整格式
+4. 配置封面图片
+5. 点击群发
+========================================
+`;
+  
+  // 写入文件
+  fs.writeFileSync(filepath, fileContent, 'utf-8');
+  
+  console.log('📄 今日文章文件已生成:', filename);
+  console.log('📁 文件路径:', filepath);
+  
+  return filepath;
 }
 
-// 上传临时素材（用于图片）
-function uploadMedia(accessToken, filePath, type = 'image') {
-  return new Promise((resolve, reject) => {
-    // 如果没有图片，跳过
-    if (!filePath || !fs.existsSync(filePath)) {
-      resolve(null);
-      return;
-    }
-    
-    // 读取文件
-    const boundary = '----WebKitFormBoundary' + Date.now();
-    const fileData = fs.readFileSync(filePath);
-    
-    const options = {
-      hostname: 'api.weixin.qq.com',
-      port: 443,
-      path: `/cgi-bin/media/upload?access_token=${accessToken}&type=${type}`,
-      method: 'POST',
-      headers: {
-        'Content-Type': `multipart/form-data; boundary=${boundary}`
-      }
-    };
-
-    const req = https.request(options, (res) => {
-      let data = '';
-      res.on('data', (chunk) => {
-        data += chunk;
-      });
-      res.on('end', () => {
-        try {
-          const response = JSON.parse(data);
-          if (response.media_id) {
-            resolve(response.media_id);
-          } else {
-            resolve(null);
-          }
-        } catch (e) {
-          resolve(null);
-        }
-      });
-    });
-
-    req.on('error', () => {
-      resolve(null);
-    });
-
-    req.write(`--${boundary}\r\n`);
-    req.write(`Content-Disposition: form-data; name="media"; filename="${path.basename(filePath)}"\r\n`);
-    req.write(`Content-Type: image/jpeg\r\n\r\n`);
-    req.write(fileData);
-    req.write(`\r\n--${boundary}--\r\n`);
-    req.end();
-  });
-}
-
-// 发布图文素材
-function addNews(accessToken, article) {
-  return new Promise((resolve, reject) => {
-    const postData = JSON.stringify({
-      articles: [
-        {
-          title: article.metadata.title || '一弭智慧',
-          author: article.metadata.author || '一弭',
-          digest: article.content.substring(0, 100),
-          content: article.content,
-          content_source_url: 'https://onestand.cn',
-          thumb_media_id: '', // 封面图片，留空使用默认
-          show_cover_pic: 0,
-          need_open_comment: 1,
-          only_fans_can_comment: 0
-        }
-      ]
-    });
-
-    const options = {
-      hostname: 'api.weixin.qq.com',
-      port: 443,
-      path: `/cgi-bin/draft/add?access_token=${accessToken}`,
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Content-Length': Buffer.byteLength(postData)
-      }
-    };
-
-    const req = https.request(options, (res) => {
-      let data = '';
-      res.on('data', (chunk) => {
-        data += chunk;
-      });
-      res.on('end', () => {
-        try {
-          const response = JSON.parse(data);
-          if (response.media_id || response.errcode === 0) {
-            resolve(response.media_id);
-          } else {
-            reject(new Error(`发布失败: ${response.errmsg} (errcode: ${response.errcode})`));
-          }
-        } catch (e) {
-          reject(new Error(`解析响应失败: ${e.message}`));
-        }
-      });
-    });
-
-    req.on('error', (e) => {
-      reject(new Error(`请求失败: ${e.message}`));
-    });
-
-    req.write(postData);
-    req.end();
-  });
-}
-
-// 发布到公众号
+// 发布到公众号（个人号，生成文件供手动发布）
 async function publishToWeChat(article) {
-  console.log('正在发布文章到公众号...');
+  console.log('正在准备今日文章内容...');
   console.log('标题:', article.metadata.title);
   console.log('分类:', article.metadata.category);
 
-  try {
-    // 1. 获取Access Token
-    console.log('📱 获取Access Token...');
-    const accessToken = await getAccessToken();
-    console.log('✅ Access Token获取成功');
-
-    // 2. 发布图文素材
-    console.log('📝 发布图文素材...');
-    const mediaId = await addNews(accessToken, article);
-    console.log('✅ 图文素材发布成功, media_id:', mediaId);
-
-    // 3. （可选）发布草稿到公号
-    // 如果需要直接发布，使用 freepublish/submit 接口
-    console.log('✅ 文章发布成功');
-    return true;
-
-  } catch (error) {
-    console.error('❌ 发布失败:', error.message);
-    throw error;
-  }
+  // 生成今日文章文件
+  const filepath = generateTodayFile(article.content, article.metadata);
+  
+  console.log('✅ 文章准备完成');
+  console.log('');
+  console.log('========================================');
+  console.log('📋 复制以下内容到公众号：');
+  console.log('========================================');
+  console.log('');
+  console.log(article.content);
+  console.log('');
+  console.log('========================================');
+  console.log('📦 文件已生成，可从Actions Artifacts下载');
+  console.log('========================================');
+  
+  return true;
 }
 
 async function main() {
   console.log('🚀 开始执行自动发布任务...');
-  
-  // 检查配置
-  if (!appId || !appSecret) {
-    console.error('❌ 缺少公众号配置');
-    console.error('请在GitHub Secrets中配置 WECHAT_APPID 和 WECHAT_APPSECRET');
-    console.error('或者在 config.json 中配置 wechat.appId 和 wechat.appSecret');
-    process.exit(1);
-  }
+  console.log('当前时间:', new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' }));
+  console.log('');
 
   const articlePath = getTodayArticle();
   console.log('今日文章路径:', articlePath);
@@ -262,14 +152,27 @@ async function main() {
     process.exit(1);
   }
 
+  console.log('');
+  console.log('原始文章标题:', article.metadata.title);
+  console.log('原始文章长度:', article.content.length);
+  console.log('');
+
   const formatted = formatForWeChat(article);
   console.log('文章已格式化，长度:', formatted.length);
+  console.log('');
   
   try {
     const success = await publishToWeChat({ metadata: article.metadata, content: formatted });
     
     if (success) {
+      console.log('');
       console.log('✅ 发布任务完成');
+      console.log('');
+      console.log('📌 下一步操作：');
+      console.log('1. 在Actions页面找到本次运行记录');
+      console.log('2. 点击 "Artifacts" 下载 "今日文章-YYYY-MM-DD.txt"');
+      console.log('3. 打开文件，复制内容到公众号后台');
+      console.log('4. 调整格式后群发');
     } else {
       console.error('❌ 发布失败');
       process.exit(1);
